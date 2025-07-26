@@ -65,10 +65,6 @@ function generateSampleFranceHexagons(): HexData[] {
     { lat: 48.1173, lng: -1.6778, name: 'Rennes' },
     { lat: 47.4784, lng: -0.5632, name: 'Angers' },
     { lat: 43.7102, lng: 7.2620, name: 'Nice' },
-    // Add Corsica locations
-    { lat: 42.1528, lng: 9.0124, name: 'Ajaccio' },
-    { lat: 42.6977, lng: 9.4500, name: 'Bastia' },
-    { lat: 41.9192, lng: 8.7386, name: 'Propriano' },
   ];
 
   return frenchCities.map((city, index) => {
@@ -95,13 +91,13 @@ function generateSampleFranceHexagons(): HexData[] {
 }
 
 const INITIAL_VIEW_STATE = {
-  longitude: 4.0,  // Centered to include both France mainland and Corsica
-  latitude: 44.0,  // Lower latitude to include Corsica
-  zoom: 5,         // Zoomed out to show both regions
+  longitude: 2.2137,
+  latitude: 46.2276,
+  zoom: 6,
   pitch: 45,
   bearing: -20,
   maxZoom: 12,
-  minZoom: 3       // Allow more zoom out
+  minZoom: 4
 };
 
 const DatacenterMap = forwardRef<DatacenterMapRef, DatacenterMapProps>(
@@ -183,8 +179,6 @@ const DatacenterMap = forwardRef<DatacenterMapRef, DatacenterMapProps>(
     // Update map function
     const updateMap = useCallback((data: BackendResponse): void => {
       try {
-        console.log('Received backend data:', data);
-        
         if (!validateHexData(data)) {
           console.warn('Data validation failed, keeping current data');
           return;
@@ -192,7 +186,6 @@ const DatacenterMap = forwardRef<DatacenterMapRef, DatacenterMapProps>(
 
         setIsLoading(true);
         const transformedData = transformBackendData(data);
-        console.log('Transformed data:', transformedData);
         setHexData(transformedData);
         console.log('Map updated with', transformedData.length, 'hexagons');
       } catch (error) {
@@ -210,87 +203,45 @@ const DatacenterMap = forwardRef<DatacenterMapRef, DatacenterMapProps>(
     // updateMap function is exposed via ref using useImperativeHandle
 
     const layers = [
-          // Base map layer using dark Carto style for modern look
-    new TileLayer({
-      id: 'carto-dark',
-      data: 'https://a.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}@2.png',
-      minZoom: 0,
-      maxZoom: 19,
-      renderSubLayers: (props: any) => {
-        const {
-          bbox: { west, south, east, north }
-        } = props.tile;
+      // Base map layer using dark Carto style for modern look
+      new TileLayer({
+        id: 'carto-dark',
+        data: 'https://a.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}@2.png',
+        minZoom: 0,
+        maxZoom: 19,
+        renderSubLayers: (props: any) => {
+          const {
+            bbox: { west, south, east, north }
+          } = props.tile;
 
-        return new BitmapLayer(props, {
-          data: undefined,
-          image: props.data,
-          bounds: [west, south, east, north]
-        });
-      }
-    }),
-      // H3 hexagon layer on top (only if we have data and not loading)
-      ...(hexData.length > 0 && !isLoading ? [
+          return new BitmapLayer(props, {
+            data: undefined,
+            image: props.data,
+            bounds: [west, south, east, north]
+          });
+        }
+      }),
+      // Score layer
+      ...(hexData.length > 0 && !isLoading && activeLayer === 'score' ? [
         new H3HexagonLayer<HexData>({
-          id: 'h3-hexagons',
+          id: 'h3-hexagons-score',
           data: hexData,
           getHexagon: (d: HexData) => d.hex,
           getFillColor: (d: HexData) => {
-            // Get the value based on active layer
-            let value = 0;
-            switch (activeLayer) {
-              case 'score':
-                value = d.score;
-                break;
-              case 'connection':
-                value = d.connection_normalized_score || 0;
-                break;
-              case 'latency':
-                value = d.latency_normalized_score || 0;
-                break;
-              case 'temperature':
-                value = d.temperature_normalized_score || 0;
-                break;
-              default:
-                value = d.score;
-            }
-            
-            const normalizedValue = Math.max(0, Math.min(1, value));
+            const normalizedValue = Math.max(0, Math.min(1, d.score));
             
             if (normalizedValue < 0.3) {
-              // Low scores: Red to Orange
               const t = normalizedValue / 0.3;
               return [255, Math.round(100 + 155 * t), 50, 220];
             } else if (normalizedValue < 0.7) {
-              // Mid scores: Orange to Yellow
               const t = (normalizedValue - 0.3) / 0.4;
               return [255, Math.round(255), Math.round(50 + 205 * t), 220];
             } else {
-              // High scores: Yellow to Green
               const t = (normalizedValue - 0.7) / 0.3;
               return [Math.round(255 - 100 * t), 255, Math.round(255 - 155 * t), 220];
             }
           },
-          getElevation: (d: HexData) => {
-            // Get the value based on active layer for elevation
-            let value = 0;
-            switch (activeLayer) {
-              case 'score':
-                value = d.score;
-                break;
-              case 'connection':
-                value = d.connection_normalized_score || 0;
-                break;
-              case 'latency':
-                value = d.latency_normalized_score || 0;
-                break;
-              case 'temperature':
-                value = d.temperature_normalized_score || 0;
-                break;
-              default:
-                value = d.score;
-            }
-            return value * 5000;
-          },
+          getElevation: (d: HexData) => d.score * 5000,
           elevationScale: 1,
           pickable: true,
           stroked: true,
@@ -299,6 +250,132 @@ const DatacenterMap = forwardRef<DatacenterMapRef, DatacenterMapProps>(
           wireframe: false,
           lineWidthMinPixels: 1,
           getLineColor: (d: HexData) => d.score > 0.8 ? [255, 255, 255, 120] : [255, 255, 255, 60],
+          material: {
+            ambient: 0.64,
+            diffuse: 0.6,
+            shininess: 32,
+            specularColor: [51, 51, 51]
+          },
+          transitions: {
+            getElevation: 600,
+            getFillColor: 300
+          }
+        })
+      ] : []),
+      // Connection layer
+      ...(hexData.length > 0 && !isLoading && activeLayer === 'connection' ? [
+        new H3HexagonLayer<HexData>({
+          id: 'h3-hexagons-connection',
+          data: hexData,
+          getHexagon: (d: HexData) => d.hex,
+          getFillColor: (d: HexData) => {
+            const value = d.connection_normalized_score || 0;
+            const normalizedValue = Math.max(0, Math.min(1, value));
+            
+            if (normalizedValue < 0.3) {
+              const t = normalizedValue / 0.3;
+              return [255, Math.round(100 + 155 * t), 50, 220];
+            } else if (normalizedValue < 0.7) {
+              const t = (normalizedValue - 0.3) / 0.4;
+              return [255, Math.round(255), Math.round(50 + 205 * t), 220];
+            } else {
+              const t = (normalizedValue - 0.7) / 0.3;
+              return [Math.round(255 - 100 * t), 255, Math.round(255 - 155 * t), 220];
+            }
+          },
+          getElevation: (d: HexData) => (d.connection_normalized_score || 0) * 5000,
+          elevationScale: 1,
+          pickable: true,
+          stroked: true,
+          filled: true,
+          extruded: true,
+          wireframe: false,
+          lineWidthMinPixels: 1,
+          getLineColor: (d: HexData) => (d.connection_normalized_score || 0) > 0.8 ? [255, 255, 255, 120] : [255, 255, 255, 60],
+          material: {
+            ambient: 0.64,
+            diffuse: 0.6,
+            shininess: 32,
+            specularColor: [51, 51, 51]
+          },
+          transitions: {
+            getElevation: 600,
+            getFillColor: 300
+          }
+        })
+      ] : []),
+      // Latency layer
+      ...(hexData.length > 0 && !isLoading && activeLayer === 'latency' ? [
+        new H3HexagonLayer<HexData>({
+          id: 'h3-hexagons-latency',
+          data: hexData,
+          getHexagon: (d: HexData) => d.hex,
+          getFillColor: (d: HexData) => {
+            const value = d.latency_normalized_score || 0;
+            const normalizedValue = Math.max(0, Math.min(1, value));
+            
+            if (normalizedValue < 0.3) {
+              const t = normalizedValue / 0.3;
+              return [255, Math.round(100 + 155 * t), 50, 220];
+            } else if (normalizedValue < 0.7) {
+              const t = (normalizedValue - 0.3) / 0.4;
+              return [255, Math.round(255), Math.round(50 + 205 * t), 220];
+            } else {
+              const t = (normalizedValue - 0.7) / 0.3;
+              return [Math.round(255 - 100 * t), 255, Math.round(255 - 155 * t), 220];
+            }
+          },
+          getElevation: (d: HexData) => (d.latency_normalized_score || 0) * 5000,
+          elevationScale: 1,
+          pickable: true,
+          stroked: true,
+          filled: true,
+          extruded: true,
+          wireframe: false,
+          lineWidthMinPixels: 1,
+          getLineColor: (d: HexData) => (d.latency_normalized_score || 0) > 0.8 ? [255, 255, 255, 120] : [255, 255, 255, 60],
+          material: {
+            ambient: 0.64,
+            diffuse: 0.6,
+            shininess: 32,
+            specularColor: [51, 51, 51]
+          },
+          transitions: {
+            getElevation: 600,
+            getFillColor: 300
+          }
+        })
+      ] : []),
+      // Temperature layer
+      ...(hexData.length > 0 && !isLoading && activeLayer === 'temperature' ? [
+        new H3HexagonLayer<HexData>({
+          id: 'h3-hexagons-temperature',
+          data: hexData,
+          getHexagon: (d: HexData) => d.hex,
+          getFillColor: (d: HexData) => {
+            const value = d.temperature_normalized_score || 0;
+            const normalizedValue = Math.max(0, Math.min(1, value));
+            
+            if (normalizedValue < 0.3) {
+              const t = normalizedValue / 0.3;
+              return [255, Math.round(100 + 155 * t), 50, 220];
+            } else if (normalizedValue < 0.7) {
+              const t = (normalizedValue - 0.3) / 0.4;
+              return [255, Math.round(255), Math.round(50 + 205 * t), 220];
+            } else {
+              const t = (normalizedValue - 0.7) / 0.3;
+              return [Math.round(255 - 100 * t), 255, Math.round(255 - 155 * t), 220];
+            }
+          },
+          getElevation: (d: HexData) => (d.temperature_normalized_score || 0) * 5000,
+          elevationScale: 1,
+          pickable: true,
+          stroked: true,
+          filled: true,
+          extruded: true,
+          wireframe: false,
+          lineWidthMinPixels: 1,
+          getLineColor: (d: HexData) => (d.temperature_normalized_score || 0) > 0.8 ? [255, 255, 255, 120] : [255, 255, 255, 60],
           material: {
             ambient: 0.64,
             diffuse: 0.6,
