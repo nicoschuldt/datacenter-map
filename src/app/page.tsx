@@ -83,7 +83,7 @@ export default function Home() {
       </div>
       
       {/* Chat sidebar */}
-      <div className="w-80 border-l bg-card">
+      <div className="w-[475px] border-l bg-gradient-to-br from-[#18181b] to-[#23232a]">
         <Chat onMapUpdate={handleMapUpdate} />
       </div>
     </div>

@@ -195,10 +195,10 @@ const DatacenterMap = forwardRef<DatacenterMapRef, DatacenterMapProps>(
     // updateMap function is exposed via ref using useImperativeHandle
 
     const layers = [
-          // Base map layer using Carto Positron style for clean look
+          // Base map layer using dark Carto style for modern look
     new TileLayer({
-      id: 'carto-positron',
-      data: 'https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
+      id: 'carto-dark',
+      data: 'https://a.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}@2.png',
       minZoom: 0,
       maxZoom: 19,
       renderSubLayers: (props: any) => {
@@ -274,44 +274,17 @@ const DatacenterMap = forwardRef<DatacenterMapRef, DatacenterMapProps>(
             
             return {
               html: `
-                <div class="bg-white/95 backdrop-blur-sm text-gray-900 p-4 rounded-lg shadow-lg border border-gray-200 max-w-xs">
-                  <div class="font-semibold text-gray-700 mb-3 text-sm">Location ${data.hex.slice(-6).toUpperCase()}</div>
-                  <div class="space-y-2 text-sm">
-                    <div class="flex items-center justify-between">
-                      <span class="text-gray-600">Score</span>
-                      <span class="font-bold" style="color: ${scoreColor}">${(data.score * 100).toFixed(0)}%</span>
-                    </div>
-                    ${data.avgTemp ? `
-                      <div class="flex items-center justify-between">
-                        <span class="text-gray-600">🌡️ Temperature</span>
-                        <span class="font-medium">${data.avgTemp}°C</span>
-                      </div>
-                    ` : ''}
-                    ${data.internetSpeed ? `
-                      <div class="flex items-center justify-between">
-                        <span class="text-gray-600">🌐 Internet</span>
-                        <span class="font-medium">${data.internetSpeed} Mbps</span>
-                      </div>
-                    ` : ''}
-                    ${data.gridDistance ? `
-                      <div class="flex items-center justify-between">
-                        <span class="text-gray-600">⚡ Grid Distance</span>
-                        <span class="font-medium">${data.gridDistance}km</span>
-                      </div>
-                    ` : ''}
-                    ${data.nbGridConnections ? `
-                      <div class="flex items-center justify-between">
-                        <span class="text-gray-600">🔌 Connections</span>
-                        <span class="font-medium">${data.nbGridConnections}</span>
-                      </div>
-                    ` : ''}
-                    ${data.opposition ? `
-                      <div class="flex items-center justify-between">
-                        <span class="text-gray-600">👥 Opposition</span>
-                        <span class="font-medium capitalize">${data.opposition}</span>
-                      </div>
-                    ` : ''}
+                <div style="background: rgba(24,24,27,0.98); color: #e5e7eb; border-radius: 14px; box-shadow: 0 4px 32px 0 rgba(0,0,0,0.45); border: 1.5px solid #23232a; padding: 18px 20px; min-width: 240px; max-width: 320px; font-family: 'Inter', 'Geist', 'sans-serif'; font-size: 15px;">
+                  <div style="font-weight: 600; color: #f3f4f6; margin-bottom: 10px; font-size: 15px;">Location <span style="color:#e5e7eb;">${data.hex.slice(-6).toUpperCase()}</span></div>
+                  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                    <span style="color: #a1a1aa;">Score</span>
+                    <span style="font-weight: 700; color: ${scoreColor}; font-size: 16px;">${(data.score * 100).toFixed(0)}%</span>
                   </div>
+                  ${data.avgTemp ? `<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;"><span style="color: #f87171;">🌡️ Temperature</span><span style="font-weight: 500; color: #f3f4f6;">${data.avgTemp}°C</span></div>` : ''}
+                  ${data.internetSpeed ? `<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;"><span style="color: #38bdf8;">🌐 Internet</span><span style="font-weight: 500; color: #f3f4f6;">${data.internetSpeed} Mbps</span></div>` : ''}
+                  ${data.gridDistance ? `<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;"><span style="color: #facc15;">⚡ Grid Distance</span><span style="font-weight: 500; color: #f3f4f6;">${data.gridDistance}km</span></div>` : ''}
+                  ${data.nbGridConnections ? `<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;"><span style="color: #a3e635;">🔌 Connections</span><span style="font-weight: 500; color: #f3f4f6;">${data.nbGridConnections}</span></div>` : ''}
+                  ${data.opposition ? `<div style="display: flex; align-items: center; justify-content: space-between;"><span style="color: #818cf8;">👥 Opposition</span><span style="font-weight: 500; color: #f3f4f6; text-transform: capitalize;">${data.opposition}</span></div>` : ''}
                 </div>
               `,
               style: { 
