@@ -4,6 +4,7 @@ import { DeckGL } from '@deck.gl/react';
 import { H3HexagonLayer, TileLayer } from '@deck.gl/geo-layers';
 import { BitmapLayer } from '@deck.gl/layers';
 import { PickingInfo } from '@deck.gl/core';
+import { DataFilterExtension } from '@deck.gl/extensions';
 import { latLngToCell } from 'h3-js';
 import { useState, useEffect, useImperativeHandle, forwardRef, useCallback } from 'react';
 
@@ -107,6 +108,29 @@ const DatacenterMap = forwardRef<DatacenterMapRef, DatacenterMapProps>(
       initialData || generateSampleFranceHexagons()
     );
     const [isLoading, setIsLoading] = useState(showLoadingState);
+    
+    // Filter state - 0 means show all, higher values filter to top percentages
+    const [filterThreshold, setFilterThreshold] = useState(0);
+
+    // Helper function to get filter value based on active layer
+    const getFilterValue = (d: HexData): number => {
+      switch (activeLayer) {
+        case 'score':
+          return d.score;
+        case 'connection':
+          return d.connection_normalized_score || 0;
+        case 'latency':
+          return d.latency_normalized_score || 0;
+        case 'temperature':
+          return d.temperature_normalized_score || 0;
+        default:
+          return d.score;
+      }
+    };
+
+    // Calculate filter range based on threshold percentage
+    const minFilterValue = filterThreshold / 100; // Convert percentage to 0-1 range
+    const filterRange: [number, number] = [minFilterValue, 1];
 
     // Data validation function
     const validateHexData = (data: BackendResponse): boolean => {
@@ -259,7 +283,11 @@ const DatacenterMap = forwardRef<DatacenterMapRef, DatacenterMapProps>(
           transitions: {
             getElevation: 600,
             getFillColor: 300
-          }
+          },
+          extensions: [new DataFilterExtension({ filterSize: 1 })],
+          // @ts-ignore - DataFilterExtension properties
+          getFilterValue: (d: HexData) => getFilterValue(d),
+          filterRange: filterRange
         })
       ] : []),
       // Connection layer
@@ -301,7 +329,11 @@ const DatacenterMap = forwardRef<DatacenterMapRef, DatacenterMapProps>(
           transitions: {
             getElevation: 600,
             getFillColor: 300
-          }
+          },
+          extensions: [new DataFilterExtension({ filterSize: 1 })],
+          // @ts-ignore - DataFilterExtension properties
+          getFilterValue: (d: HexData) => getFilterValue(d),
+          filterRange: filterRange
         })
       ] : []),
       // Latency layer
@@ -343,7 +375,11 @@ const DatacenterMap = forwardRef<DatacenterMapRef, DatacenterMapProps>(
           transitions: {
             getElevation: 600,
             getFillColor: 300
-          }
+          },
+          extensions: [new DataFilterExtension({ filterSize: 1 })],
+          // @ts-ignore - DataFilterExtension properties
+          getFilterValue: (d: HexData) => getFilterValue(d),
+          filterRange: filterRange
         })
       ] : []),
       // Temperature layer
@@ -385,7 +421,11 @@ const DatacenterMap = forwardRef<DatacenterMapRef, DatacenterMapProps>(
           transitions: {
             getElevation: 600,
             getFillColor: 300
-          }
+          },
+          extensions: [new DataFilterExtension({ filterSize: 1 })],
+          // @ts-ignore - DataFilterExtension properties
+          getFilterValue: (d: HexData) => getFilterValue(d),
+          filterRange: filterRange
         })
       ] : [])
     ];
@@ -437,27 +477,75 @@ const DatacenterMap = forwardRef<DatacenterMapRef, DatacenterMapProps>(
         
         {/* Layer Controls */}
         <div className="absolute top-6 left-6 bg-[#18181b]/95 backdrop-blur-sm text-slate-200 px-4 py-3 rounded-lg shadow-lg border border-slate-800">
-          <div className="flex flex-col gap-2">
-            <div className="text-sm font-medium text-slate-300 mb-2">Data Layer</div>
-            <div className="flex flex-col gap-1">
-              {(['score', 'connection', 'latency', 'temperature'] as LayerType[]).map((layer) => (
-                <button
-                  key={layer}
-                  onClick={() => {
-                    onLayerChange?.(layer);
-                  }}
-                  className={`text-left px-3 py-2 rounded text-sm transition-colors ${
-                    activeLayer === layer
-                      ? 'bg-slate-700 text-slate-200'
-                      : 'text-slate-400 hover:text-slate-300 hover:bg-slate-800/50'
-                  }`}
-                >
-                  {layer === 'score' && '🎯 Overall Score'}
-                  {layer === 'connection' && '🔌 Connection Points'}
-                  {layer === 'latency' && '⚡ Network Latency'}
-                  {layer === 'temperature' && '🌡️ Temperature'}
-                </button>
-              ))}
+          <div className="flex flex-col gap-4">
+            {/* Layer Selection */}
+            <div>
+              <div className="text-sm font-medium text-slate-300 mb-2">Data Layer</div>
+              <div className="flex flex-col gap-1">
+                {(['score', 'connection', 'latency', 'temperature'] as LayerType[]).map((layer) => (
+                  <button
+                    key={layer}
+                    onClick={() => {
+                      onLayerChange?.(layer);
+                    }}
+                    className={`text-left px-3 py-2 rounded text-sm transition-colors ${
+                      activeLayer === layer
+                        ? 'bg-slate-700 text-slate-200'
+                        : 'text-slate-400 hover:text-slate-300 hover:bg-slate-800/50'
+                    }`}
+                  >
+                    {layer === 'score' && '🎯 Overall Score'}
+                    {layer === 'connection' && '🔌 Connection Points'}
+                    {layer === 'latency' && '⚡ Network Latency'}
+                    {layer === 'temperature' && '🌡️ Temperature'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Filter Slider */}
+            <div className="border-t border-slate-700 pt-3">
+              <div className="text-sm font-medium text-slate-300 mb-2">
+                Filter: {filterThreshold === 0 ? 'Show All' : `Top ${100 - filterThreshold}%`}
+              </div>
+              <div className="space-y-2">
+                <input
+                  type="range"
+                  min="0"
+                  max="99"
+                  value={filterThreshold}
+                  onChange={(e) => setFilterThreshold(Number(e.target.value))}
+                  className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer slider"
+                />
+                <div className="flex justify-between text-xs text-slate-500">
+                  <span>Show All</span>
+                  <span>Top 1%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Color Legend */}
+        <div className="absolute bottom-6 left-6 bg-[#18181b]/95 backdrop-blur-sm text-slate-200 px-4 py-3 rounded-lg shadow-lg border border-slate-800">
+          <div className="flex flex-col gap-3">
+            <div className="text-sm font-medium text-slate-300">Score Range</div>
+            <div className="flex items-center gap-3">
+              <div className="flex flex-col items-center gap-1">
+                <div className="w-4 h-4 rounded" style={{ backgroundColor: 'rgb(255, 100, 50)' }}></div>
+                <span className="text-xs text-slate-400">Low</span>
+                <span className="text-xs text-slate-500">0-30%</span>
+              </div>
+              <div className="flex flex-col items-center gap-1">
+                <div className="w-4 h-4 rounded" style={{ backgroundColor: 'rgb(255, 255, 50)' }}></div>
+                <span className="text-xs text-slate-400">Med</span>
+                <span className="text-xs text-slate-500">30-70%</span>
+              </div>
+              <div className="flex flex-col items-center gap-1">
+                <div className="w-4 h-4 rounded" style={{ backgroundColor: 'rgb(155, 255, 100)' }}></div>
+                <span className="text-xs text-slate-400">High</span>
+                <span className="text-xs text-slate-500">70-100%</span>
+              </div>
             </div>
           </div>
         </div>

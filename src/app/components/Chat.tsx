@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Send, MapPin, Loader2, Sparkles, Bot, User, Copy, ThumbsUp, ThumbsDown, RotateCcw } from 'lucide-react';
+import { Send, MapPin, Loader2, Sparkles, Bot, User, Copy, ThumbsUp, ThumbsDown, RotateCcw, Search, BarChart3 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -28,17 +28,28 @@ type AnalyzeResponse = {
   hexagonData: HexagonData;
 };
 
+type ResearchMode = 'analysis' | 'research';
+
 interface ChatProps {
   onMapUpdate: (hexagonData: HexagonData) => void;
+  researchMode: ResearchMode;
+  onResearchModeChange: (mode: ResearchMode) => void;
 }
 
-const SAMPLE_QUERIES = [
-  "Show me the best locations",
-  "Find areas with low temperature", 
-  "Where are the closest grid connections?"
-];
+const SAMPLE_QUERIES = {
+  analysis: [
+    "Show me the best locations",
+    "Find areas with low temperature", 
+    "Where are the closest grid connections?"
+  ],
+  research: [
+    "What are the legal requirements?",
+    "Tell me about community opposition",
+    "Environmental regulations in France"
+  ]
+};
 
-export default function Chat({ onMapUpdate }: ChatProps) {
+export default function Chat({ onMapUpdate, researchMode, onResearchModeChange }: ChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -72,9 +83,14 @@ export default function Chat({ onMapUpdate }: ChatProps) {
     setIsLoading(true);
 
     try {
-      // TODO: Get current map view for context
+      // Get previous AI message for research context
+      const lastBotMessage = messages.filter(m => m.type === 'bot').pop();
+      
       const requestBody = {
         message: messageToSend,
+        ...(researchMode === 'research' && lastBotMessage && { 
+          previousMessage: lastBotMessage.content 
+        }),
         // context: {
         //   currentView: {
         //     lat: currentLat,
@@ -84,7 +100,10 @@ export default function Chat({ onMapUpdate }: ChatProps) {
         // }
       };
 
-      const response = await fetch('/api/analyze', {
+      // Choose endpoint based on research mode
+      const endpoint = researchMode === 'research' ? '/api/research' : '/api/analyze';
+      
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -122,13 +141,43 @@ export default function Chat({ onMapUpdate }: ChatProps) {
     <div className="flex flex-col h-full bg-gradient-to-br from-[#18181b] to-[#23232a] border-l border-slate-800">
       {/* Chat header */}
       <div className="p-6 border-b border-slate-800 bg-[#23232a]">
-        <div className="flex items-center gap-4">
-          <div className="p-3 bg-[#18181b] rounded-xl border border-slate-800">
-            <Sparkles className="h-6 w-6 text-slate-400" />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-[#18181b] rounded-xl border border-slate-800">
+              <Sparkles className="h-6 w-6 text-slate-400" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-slate-200">Datacenter AI</h2>
+              <p className="text-sm text-slate-400 mt-1">Intelligent location analysis with 3D mapping</p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-xl font-bold text-slate-200">Datacenter AI</h2>
-            <p className="text-sm text-slate-400 mt-1">Intelligent location analysis with 3D mapping</p>
+          
+          {/* Research Mode Toggle */}
+          <div className="flex items-center gap-2">
+            <div className="flex bg-[#18181b] rounded-lg border border-slate-800 p-1">
+              <button
+                onClick={() => onResearchModeChange('analysis')}
+                className={`flex items-center gap-2 px-3 py-2 rounded text-sm transition-all ${
+                  researchMode === 'analysis'
+                    ? 'bg-slate-700 text-slate-200 shadow-sm'
+                    : 'text-slate-400 hover:text-slate-300'
+                }`}
+              >
+                <BarChart3 className="h-4 w-4" />
+                Analysis
+              </button>
+              <button
+                onClick={() => onResearchModeChange('research')}
+                className={`flex items-center gap-2 px-3 py-2 rounded text-sm transition-all ${
+                  researchMode === 'research'
+                    ? 'bg-slate-700 text-slate-200 shadow-sm'
+                    : 'text-slate-400 hover:text-slate-300'
+                }`}
+              >
+                <Search className="h-4 w-4" />
+                Research
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -153,7 +202,7 @@ export default function Chat({ onMapUpdate }: ChatProps) {
             
             <div className="space-y-4 w-full max-w-md">
               <p className="text-sm font-medium text-slate-500 uppercase tracking-wider">Try asking:</p>
-              {SAMPLE_QUERIES.map((query, index) => (
+              {SAMPLE_QUERIES[researchMode].map((query: string, index: number) => (
                 <button
                   key={index}
                   className="w-full text-left p-4 text-sm border border-slate-700/50 bg-slate-800/50 hover:bg-slate-700/50 hover:border-slate-600/50 rounded-xl transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/10 group"

@@ -5,10 +5,12 @@ import DatacenterMap, { DatacenterMapRef } from './components/DatacenterMap';
 import Chat from './components/Chat';
 
 type LayerType = 'score' | 'connection' | 'latency' | 'temperature';
+type ResearchMode = 'analysis' | 'research';
 
 export default function Home() {
   const mapRef = useRef<DatacenterMapRef>(null);
   const [activeLayer, setActiveLayer] = useState<LayerType>('score');
+  const [researchMode, setResearchMode] = useState<ResearchMode>('analysis');
 
   // Example function to simulate backend data update
   const simulateBackendUpdate = (scenario: 'good' | 'bad' | 'mixed' | 'empty') => {
@@ -215,7 +217,11 @@ export default function Home() {
       
       {/* Chat sidebar */}
       <div className="w-[475px] border-l bg-gradient-to-br from-[#18181b] to-[#23232a]">
-        <Chat onMapUpdate={handleMapUpdate} />
+        <Chat 
+          onMapUpdate={handleMapUpdate} 
+          researchMode={researchMode}
+          onResearchModeChange={setResearchMode}
+        />
       </div>
     </div>
   );
