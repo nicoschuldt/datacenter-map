@@ -27,15 +27,13 @@ type InformationRequest = {
 };
 
 type HexagonDataItem = {
-  score: number;
-  internetSpeed?: number;
-  gridDistance?: number;
-  nbGridConnections?: number;
-  avgTemp?: number;
-  internetSpeedNorm?: number;
-  gridDistanceNorm?: number;
-  nbGridConnectionsNorm?: number;
-  avgTempNorm?: number;
+  score: number;      // 0-1 for color mapping
+  connection_points?: number;
+  latency_ms?: number;
+  avg_temperature?: number;
+  connection_normalized_score?: number;
+  latency_normalized_score?: number;
+  temperature_normalized_score?: number;
   opposition?: "low" | "medium" | "high";
 };
 
@@ -59,15 +57,13 @@ type AnalyzeRequest = {
 
 type HexagonData = {
   [h3Index: string]: {
-    score: number;
-    internetSpeed?: number;
-    gridDistance?: number;
-    nbGridConnections?: number;
-    avgTemp?: number;
-    internetSpeedNorm?: number;
-    gridDistanceNorm?: number;
-    nbGridConnectionsNorm?: number;
-    avgTempNorm?: number;
+    score: number;      // 0-1 for color mapping
+    connection_points?: number;
+    latency_ms?: number;
+    avg_temperature?: number;
+    connection_normalized_score?: number;
+    latency_normalized_score?: number;
+    temperature_normalized_score?: number;
     opposition?: "low" | "medium" | "high";
   };
 };
@@ -88,7 +84,7 @@ async function callBackendAPI(message: string, context?: Context): Promise<Infor
   };
 
   try {
-    const response = await fetch(`${API_BASE_URL}/information`, {
+    const response = await fetch(`${API_BASE_URL}/score`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -201,10 +197,44 @@ Prioritize areas with **reliable grid connections** and **renewable energy acces
 Consider **site-specific analysis** for detailed deployment planning.`;
   }
 
+  // Generate sample hexagon data with new structure
+  const sampleHexagonData = {
+    '871fb4662ffffff': {
+      score: 0.8,
+      connection_points: 4,
+      latency_ms: 15,
+      avg_temperature: 12.5,
+      connection_normalized_score: 0.9,
+      latency_normalized_score: 0.85,
+      temperature_normalized_score: 0.8,
+      opposition: 'low' as const
+    },
+    '871f90209ffffff': {
+      score: 0.7,
+      connection_points: 3,
+      latency_ms: 22,
+      avg_temperature: 14.2,
+      connection_normalized_score: 0.7,
+      latency_normalized_score: 0.75,
+      temperature_normalized_score: 0.7,
+      opposition: 'medium' as const
+    },
+    '873968152ffffff': {
+      score: 0.9,
+      connection_points: 5,
+      latency_ms: 12,
+      avg_temperature: 11.0,
+      connection_normalized_score: 0.95,
+      latency_normalized_score: 0.9,
+      temperature_normalized_score: 0.85,
+      opposition: 'low' as const
+    }
+  };
+
   return {
     response,
-    hexagonData: {},
-    highlighted: []
+    hexagonData: sampleHexagonData,
+    highlighted: ['871fb4662ffffff']
   };
 }
 

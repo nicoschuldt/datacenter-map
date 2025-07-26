@@ -10,22 +10,27 @@ import { useState, useEffect, useImperativeHandle, forwardRef, useCallback } fro
 type HexData = {
   hex: string;
   score: number;
-  avgTemp?: number;
-  gridDistance?: number;
-  internetSpeed?: number;
-  nbGridConnections?: number;
-  internetSpeedNorm?: number;
-  gridDistanceNorm?: number;
-  nbGridConnectionsNorm?: number;
-  avgTempNorm?: number;
+  connection_points?: number;
+  latency_ms?: number;
+  avg_temperature?: number;
+  connection_normalized_score?: number;
+  latency_normalized_score?: number;
+  temperature_normalized_score?: number;
   opposition?: "low" | "medium" | "high";
 };
+
+type LayerType = 'score' | 'connection' | 'latency' | 'temperature';
 
 type BackendHexagonData = {
   [h3Index: string]: {
     score: number;
-    avgTemp: number;
-    gridDistance: number;
+    connection_points?: number;
+    latency_ms?: number;
+    avg_temperature?: number;
+    connection_normalized_score?: number;
+    latency_normalized_score?: number;
+    temperature_normalized_score?: number;
+    opposition?: "low" | "medium" | "high";
     [key: string]: any; // Allow additional fields
   };
 };
@@ -37,6 +42,8 @@ type BackendResponse = {
 interface DatacenterMapProps {
   initialData?: HexData[];
   showLoadingState?: boolean;
+  activeLayer?: LayerType;
+  onLayerChange?: (layer: LayerType) => void;
 }
 
 export interface DatacenterMapRef {
@@ -64,17 +71,20 @@ function generateSampleFranceHexagons(): HexData[] {
     const hex = latLngToCell(city.lat, city.lng, 6);
     
     // Generate varied data for each location
-    const score = Math.random() * 2 - 1; // Random score between -1 and 1
+    const score = Math.random(); // Random score between 0 and 1
     const avgTemp = 8 + Math.random() * 15; // Temperature between 8-23°C
-    const gridDistance = Math.random() * 10; // Distance 0-10km
+    const connectionPoints = Math.floor(Math.random() * 5 + 1); // 1-5 connection points
+    const latency = Math.floor(Math.random() * 50 + 10); // 10-60ms latency
     
     return {
       hex,
       score: parseFloat(score.toFixed(2)),
-      avgTemp: parseFloat(avgTemp.toFixed(1)),
-      gridDistance: parseFloat(gridDistance.toFixed(1)),
-      internetSpeed: Math.floor(Math.random() * 500 + 300), // 300-800 Mbps
-      nbGridConnections: Math.floor(Math.random() * 3 + 2), // 2-4 connections
+      avg_temperature: parseFloat(avgTemp.toFixed(1)),
+      connection_points: connectionPoints,
+      latency_ms: latency,
+      connection_normalized_score: Math.random(),
+      latency_normalized_score: Math.random(),
+      temperature_normalized_score: Math.random(),
       opposition: ["low", "medium", "high"][Math.floor(Math.random() * 3)] as "low" | "medium" | "high"
     };
   });
@@ -91,7 +101,7 @@ const INITIAL_VIEW_STATE = {
 };
 
 const DatacenterMap = forwardRef<DatacenterMapRef, DatacenterMapProps>(
-  ({ initialData, showLoadingState = false }, ref) => {
+  ({ initialData, showLoadingState = false, activeLayer = 'score', onLayerChange }, ref) => {
     // State for hexagon data
     const [hexData, setHexData] = useState<HexData[]>(
       initialData || generateSampleFranceHexagons()
@@ -156,14 +166,12 @@ const DatacenterMap = forwardRef<DatacenterMapRef, DatacenterMapProps>(
         .map(([hexId, hexInfo]) => ({
           hex: hexId,
           score: Math.max(0, Math.min(1, Number(hexInfo.score.toFixed(2)))), // Clamp to 0-1
-          avgTemp: hexInfo.avgTemp ? Number(hexInfo.avgTemp.toFixed(1)) : undefined,
-          gridDistance: hexInfo.gridDistance ? Number(hexInfo.gridDistance.toFixed(1)) : undefined,
-          internetSpeed: hexInfo.internetSpeed ? Number(hexInfo.internetSpeed.toFixed(0)) : undefined,
-          nbGridConnections: hexInfo.nbGridConnections || undefined,
-          internetSpeedNorm: hexInfo.internetSpeedNorm ? Number(hexInfo.internetSpeedNorm.toFixed(2)) : undefined,
-          gridDistanceNorm: hexInfo.gridDistanceNorm ? Number(hexInfo.gridDistanceNorm.toFixed(2)) : undefined,
-          nbGridConnectionsNorm: hexInfo.nbGridConnectionsNorm ? Number(hexInfo.nbGridConnectionsNorm.toFixed(2)) : undefined,
-          avgTempNorm: hexInfo.avgTempNorm ? Number(hexInfo.avgTempNorm.toFixed(2)) : undefined,
+          connection_points: hexInfo.connection_points || undefined,
+          latency_ms: hexInfo.latency_ms || undefined,
+          avg_temperature: hexInfo.avg_temperature || undefined,
+          connection_normalized_score: hexInfo.connection_normalized_score ? Number(hexInfo.connection_normalized_score.toFixed(2)) : undefined,
+          latency_normalized_score: hexInfo.latency_normalized_score ? Number(hexInfo.latency_normalized_score.toFixed(2)) : undefined,
+          temperature_normalized_score: hexInfo.temperature_normalized_score ? Number(hexInfo.temperature_normalized_score.toFixed(2)) : undefined,
           opposition: hexInfo.opposition || undefined
         }));
     };
@@ -220,24 +228,62 @@ const DatacenterMap = forwardRef<DatacenterMapRef, DatacenterMapProps>(
           data: hexData,
           getHexagon: (d: HexData) => d.hex,
           getFillColor: (d: HexData) => {
-            // Modern color scheme: Blue to Green gradient for better scores
-            const score = Math.max(0, Math.min(1, d.score));
+            // Get the value based on active layer
+            let value = 0;
+            switch (activeLayer) {
+              case 'score':
+                value = d.score;
+                break;
+              case 'connection':
+                value = d.connection_normalized_score || 0;
+                break;
+              case 'latency':
+                value = d.latency_normalized_score || 0;
+                break;
+              case 'temperature':
+                value = d.temperature_normalized_score || 0;
+                break;
+              default:
+                value = d.score;
+            }
             
-            if (score < 0.3) {
+            const normalizedValue = Math.max(0, Math.min(1, value));
+            
+            if (normalizedValue < 0.3) {
               // Low scores: Red to Orange
-              const t = score / 0.3;
+              const t = normalizedValue / 0.3;
               return [255, Math.round(100 + 155 * t), 50, 220];
-            } else if (score < 0.7) {
+            } else if (normalizedValue < 0.7) {
               // Mid scores: Orange to Yellow
-              const t = (score - 0.3) / 0.4;
+              const t = (normalizedValue - 0.3) / 0.4;
               return [255, Math.round(255), Math.round(50 + 205 * t), 220];
             } else {
               // High scores: Yellow to Green
-              const t = (score - 0.7) / 0.3;
+              const t = (normalizedValue - 0.7) / 0.3;
               return [Math.round(255 - 100 * t), 255, Math.round(255 - 155 * t), 220];
             }
           },
-          getElevation: (d: HexData) => d.score * 5000, // Height based on score
+          getElevation: (d: HexData) => {
+            // Get the value based on active layer for elevation
+            let value = 0;
+            switch (activeLayer) {
+              case 'score':
+                value = d.score;
+                break;
+              case 'connection':
+                value = d.connection_normalized_score || 0;
+                break;
+              case 'latency':
+                value = d.latency_normalized_score || 0;
+                break;
+              case 'temperature':
+                value = d.temperature_normalized_score || 0;
+                break;
+              default:
+                value = d.score;
+            }
+            return value * 5000;
+          },
           elevationScale: 1,
           pickable: true,
           stroked: true,
@@ -280,10 +326,9 @@ const DatacenterMap = forwardRef<DatacenterMapRef, DatacenterMapProps>(
                     <span style="color: #a1a1aa;">Score</span>
                     <span style="font-weight: 700; color: ${scoreColor}; font-size: 16px;">${(data.score * 100).toFixed(0)}%</span>
                   </div>
-                  ${data.avgTemp ? `<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;"><span style="color: #f87171;">🌡️ Temperature</span><span style="font-weight: 500; color: #f3f4f6;">${data.avgTemp}°C</span></div>` : ''}
-                  ${data.internetSpeed ? `<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;"><span style="color: #38bdf8;">🌐 Internet</span><span style="font-weight: 500; color: #f3f4f6;">${data.internetSpeed} Mbps</span></div>` : ''}
-                  ${data.gridDistance ? `<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;"><span style="color: #facc15;">⚡ Grid Distance</span><span style="font-weight: 500; color: #f3f4f6;">${data.gridDistance}km</span></div>` : ''}
-                  ${data.nbGridConnections ? `<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;"><span style="color: #a3e635;">🔌 Connections</span><span style="font-weight: 500; color: #f3f4f6;">${data.nbGridConnections}</span></div>` : ''}
+                  ${data.avg_temperature ? `<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;"><span style="color: #f87171;">🌡️ Temperature</span><span style="font-weight: 500; color: #f3f4f6;">${data.avg_temperature}°C</span></div>` : ''}
+                  ${data.connection_points ? `<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;"><span style="color: #38bdf8;">🔌 Connection Points</span><span style="font-weight: 500; color: #f3f4f6;">${data.connection_points}</span></div>` : ''}
+                  ${data.latency_ms ? `<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;"><span style="color: #facc15;">⚡ Latency</span><span style="font-weight: 500; color: #f3f4f6;">${data.latency_ms}ms</span></div>` : ''}
                   ${data.opposition ? `<div style="display: flex; align-items: center; justify-content: space-between;"><span style="color: #818cf8;">👥 Opposition</span><span style="font-weight: 500; color: #f3f4f6; text-transform: capitalize;">${data.opposition}</span></div>` : ''}
                 </div>
               `,
@@ -306,11 +351,38 @@ const DatacenterMap = forwardRef<DatacenterMapRef, DatacenterMapProps>(
           </div>
         )}
         
+        {/* Layer Controls */}
+        <div className="absolute top-6 left-6 bg-[#18181b]/95 backdrop-blur-sm text-slate-200 px-4 py-3 rounded-lg shadow-lg border border-slate-800">
+          <div className="flex flex-col gap-2">
+            <div className="text-sm font-medium text-slate-300 mb-2">Data Layer</div>
+            <div className="flex flex-col gap-1">
+              {(['score', 'connection', 'latency', 'temperature'] as LayerType[]).map((layer) => (
+                <button
+                  key={layer}
+                  onClick={() => {
+                    onLayerChange?.(layer);
+                  }}
+                  className={`text-left px-3 py-2 rounded text-sm transition-colors ${
+                    activeLayer === layer
+                      ? 'bg-slate-700 text-slate-200'
+                      : 'text-slate-400 hover:text-slate-300 hover:bg-slate-800/50'
+                  }`}
+                >
+                  {layer === 'score' && '🎯 Overall Score'}
+                  {layer === 'connection' && '🔌 Connection Points'}
+                  {layer === 'latency' && '⚡ Network Latency'}
+                  {layer === 'temperature' && '🌡️ Temperature'}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
         {/* Empty state message */}
         {hexData.length === 0 && !isLoading && (
-          <div className="absolute top-6 left-6 bg-white/95 backdrop-blur text-gray-900 px-4 py-3 rounded-lg shadow-lg border border-gray-200">
+          <div className="absolute top-6 right-6 bg-[#18181b]/95 backdrop-blur-sm text-slate-200 px-4 py-3 rounded-lg shadow-lg border border-slate-800">
             <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+              <div className="w-2 h-2 bg-slate-400 rounded-full"></div>
               <span className="text-sm font-medium">No datacenter data available</span>
             </div>
           </div>
