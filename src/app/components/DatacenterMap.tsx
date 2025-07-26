@@ -5,7 +5,7 @@ import { H3HexagonLayer, TileLayer } from '@deck.gl/geo-layers';
 import { BitmapLayer } from '@deck.gl/layers';
 import { PickingInfo } from '@deck.gl/core';
 import { latLngToCell } from 'h3-js';
-import { useState, useEffect, useImperativeHandle, forwardRef } from 'react';
+import { useState, useEffect, useImperativeHandle, forwardRef, useCallback } from 'react';
 
 type HexData = {
   hex: string;
@@ -35,7 +35,6 @@ type BackendResponse = {
 };
 
 interface DatacenterMapProps {
-  onUpdateMap?: (updateMapFunction: (data: BackendResponse) => void) => void;
   initialData?: HexData[];
   showLoadingState?: boolean;
 }
@@ -62,7 +61,7 @@ function generateSampleFranceHexagons(): HexData[] {
   ];
 
   return frenchCities.map((city, index) => {
-    const hex = latLngToCell(city.lat, city.lng, 7);
+    const hex = latLngToCell(city.lat, city.lng, 6);
     
     // Generate varied data for each location
     const score = Math.random() * 2 - 1; // Random score between -1 and 1
@@ -90,7 +89,7 @@ const INITIAL_VIEW_STATE = {
 };
 
 const DatacenterMap = forwardRef<DatacenterMapRef, DatacenterMapProps>(
-  ({ onUpdateMap, initialData, showLoadingState = false }, ref) => {
+  ({ initialData, showLoadingState = false }, ref) => {
     // State for hexagon data
     const [hexData, setHexData] = useState<HexData[]>(
       initialData || generateSampleFranceHexagons()
@@ -168,16 +167,14 @@ const DatacenterMap = forwardRef<DatacenterMapRef, DatacenterMapProps>(
     };
 
     // Update map function
-    const updateMap = (data: BackendResponse): void => {
-      setIsLoading(true);
-      
+    const updateMap = useCallback((data: BackendResponse): void => {
       try {
         if (!validateHexData(data)) {
-          console.error('Data validation failed, keeping current data');
-          setIsLoading(false);
+          console.warn('Data validation failed, keeping current data');
           return;
         }
 
+        setIsLoading(true);
         const transformedData = transformBackendData(data);
         setHexData(transformedData);
         console.log('Map updated with', transformedData.length, 'hexagons');
@@ -186,19 +183,14 @@ const DatacenterMap = forwardRef<DatacenterMapRef, DatacenterMapProps>(
       } finally {
         setIsLoading(false);
       }
-    };
+    }, []);
 
     // Expose updateMap function to parent components
     useImperativeHandle(ref, () => ({
       updateMap
     }));
 
-    // Provide updateMap to parent via callback
-    useEffect(() => {
-      if (onUpdateMap) {
-        onUpdateMap(updateMap);
-      }
-    }, []); // Remove onUpdateMap dependency to prevent infinite loop
+    // updateMap function is exposed via ref using useImperativeHandle
 
     const layers = [
       // Base map layer using free OpenStreetMap tiles

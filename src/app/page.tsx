@@ -1,12 +1,11 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef, useCallback } from 'react';
 import DatacenterMap, { DatacenterMapRef } from './components/DatacenterMap';
 import Chat from './components/Chat';
 
 export default function Home() {
   const mapRef = useRef<DatacenterMapRef>(null);
-  const [updateMapFunction, setUpdateMapFunction] = useState<((data: any) => void) | null>(null);
 
   // Example function to simulate backend data update
   const simulateBackendUpdate = (scenario: 'good' | 'bad' | 'mixed' | 'empty') => {
@@ -54,15 +53,13 @@ export default function Home() {
         return;
     }
 
-    // Use either ref method or callback method
+    // Use ref method only
     if (mapRef.current) {
       mapRef.current.updateMap(mockBackendResponse);
-    } else if (updateMapFunction) {
-      updateMapFunction(mockBackendResponse);
     }
   };
 
-  const handleMapUpdate = (hexagonData: any) => {
+  const handleMapUpdate = useCallback((hexagonData: any) => {
     // Ensure proper data format
     const backendResponse = {
       hexagonData: hexagonData || {}
@@ -72,54 +69,22 @@ export default function Home() {
     setTimeout(() => {
       if (mapRef.current) {
         mapRef.current.updateMap(backendResponse);
-      } else if (updateMapFunction) {
-        updateMapFunction(backendResponse);
       }
     }, 0);
-  };
+  }, []);
 
   return (
-    <div className="flex w-full h-screen">
+    <div className="flex w-full h-screen bg-background">
       {/* Map container */}
-      <div className="flex-1">
+      <div className="flex-1 relative">
         <DatacenterMap 
           ref={mapRef}
-          onUpdateMap={setUpdateMapFunction}
         />
       </div>
       
       {/* Chat sidebar */}
-      <div className="w-96">
+      <div className="w-80 border-l bg-card">
         <Chat onMapUpdate={handleMapUpdate} />
-      </div>
-      
-      {/* Control panel - moved to top-left and made smaller */}
-      <div className="absolute top-4 left-4 bg-white p-3 rounded-lg shadow-lg space-y-1 z-10">
-        <h3 className="font-bold text-xs mb-1">Test Controls</h3>
-        <button 
-          onClick={() => simulateBackendUpdate('good')}
-          className="w-full bg-green-500 text-white px-2 py-1 rounded text-xs hover:bg-green-600 transition-colors"
-        >
-          ✅ Good
-        </button>
-        <button 
-          onClick={() => simulateBackendUpdate('bad')}
-          className="w-full bg-red-500 text-white px-2 py-1 rounded text-xs hover:bg-red-600 transition-colors"
-        >
-          ❌ Bad
-        </button>
-        <button 
-          onClick={() => simulateBackendUpdate('mixed')}
-          className="w-full bg-blue-500 text-white px-2 py-1 rounded text-xs hover:bg-blue-600 transition-colors"
-        >
-          🔄 Mixed
-        </button>
-        <button 
-          onClick={() => simulateBackendUpdate('empty')}
-          className="w-full bg-gray-500 text-white px-2 py-1 rounded text-xs hover:bg-gray-600 transition-colors"
-        >
-          🗑️ Clear
-        </button>
       </div>
     </div>
   );
