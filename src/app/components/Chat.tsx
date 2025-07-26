@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Send, MapPin, Loader2 } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 type Message = {
   id: string;
@@ -102,35 +103,40 @@ export default function Chat({ onMapUpdate }: ChatProps) {
   };
 
   return (
-    <div className="flex flex-col h-full bg-card border-l border-border">
+    <Card className="flex flex-col h-full border-0 rounded-none shadow-none">
       {/* Chat header */}
-      <div className="p-4 border-b border-border bg-muted/20">
-        <div className="flex items-center gap-2">
-          <MapPin className="h-5 w-5 text-primary" />
+      <CardHeader className="border-b bg-muted/20">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-primary/10 rounded-lg">
+            <MapPin className="h-5 w-5 text-primary" />
+          </div>
           <div>
-            <h2 className="text-lg font-semibold text-card-foreground">Datacenter Analysis</h2>
-            <p className="text-sm text-muted-foreground">Ask about locations, temperature, or grid connections</p>
+            <CardTitle className="text-lg">Datacenter Analysis</CardTitle>
+            <p className="text-sm text-muted-foreground mt-1">Ask about locations, temperature, or grid connections</p>
           </div>
         </div>
-      </div>
+      </CardHeader>
 
       {/* Messages area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <CardContent className="flex-1 overflow-y-auto p-6 space-y-4">
         {messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center space-y-4">
-            <div className="space-y-2">
-              <h3 className="text-lg font-medium text-card-foreground">Welcome!</h3>
-              <p className="text-muted-foreground text-sm">
+          <div className="flex flex-col items-center justify-center h-full text-center space-y-6">
+            <div className="space-y-3">
+              <div className="p-4 bg-primary/5 rounded-full w-fit mx-auto">
+                <MapPin className="h-8 w-8 text-primary" />
+              </div>
+              <h3 className="text-xl font-semibold text-foreground">Welcome!</h3>
+              <p className="text-muted-foreground">
                 Ask me about datacenter locations across France
               </p>
             </div>
             
-            <div className="space-y-2 w-full max-w-sm">
-              <p className="text-xs text-muted-foreground">Try asking:</p>
+            <div className="space-y-3 w-full max-w-sm">
+              <p className="text-sm font-medium text-muted-foreground">Try asking:</p>
               {SAMPLE_QUERIES.map((query, index) => (
                 <button
                   key={index}
-                  className="w-full text-left justify-start h-auto p-2 text-xs border border-input bg-background hover:bg-accent hover:text-accent-foreground rounded-md transition-colors"
+                  className="w-full text-left p-3 text-sm border border-border bg-background hover:bg-accent hover:text-accent-foreground rounded-lg transition-all duration-200 hover:shadow-sm"
                   onClick={() => handleSendMessage(query)}
                   disabled={isLoading}
                 >
@@ -149,14 +155,14 @@ export default function Chat({ onMapUpdate }: ChatProps) {
                 }`}
               >
                 <div
-                  className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
+                  className={`max-w-[85%] rounded-xl px-4 py-3 text-sm shadow-sm ${
                     message.type === 'user'
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted text-muted-foreground'
+                      ? 'bg-primary text-primary-foreground ml-8'
+                      : 'bg-muted/50 text-foreground mr-8 border border-border/50'
                   }`}
                 >
-                  <p>{message.content}</p>
-                  <p className={`text-xs mt-1 opacity-70 ${
+                  <p className="leading-relaxed">{message.content}</p>
+                  <p className={`text-xs mt-2 opacity-60 ${
                     message.type === 'user' ? 'text-primary-foreground' : 'text-muted-foreground'
                   }`}>
                     {message.timestamp.toLocaleTimeString([], { 
@@ -170,10 +176,10 @@ export default function Chat({ onMapUpdate }: ChatProps) {
             
             {isLoading && (
               <div className="flex justify-start">
-                <div className="bg-muted rounded-lg px-3 py-2">
-                  <div className="flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span className="text-sm text-muted-foreground">Analyzing...</span>
+                <div className="bg-muted/50 rounded-xl px-4 py-3 border border-border/50 mr-8">
+                  <div className="flex items-center gap-3">
+                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                    <span className="text-sm text-foreground">Analyzing locations...</span>
                   </div>
                 </div>
               </div>
@@ -181,28 +187,28 @@ export default function Chat({ onMapUpdate }: ChatProps) {
           </>
         )}
         <div ref={messagesEndRef} />
-      </div>
+      </CardContent>
 
       {/* Input area */}
-      <div className="border-t border-border p-4 bg-background">
-        <div className="flex gap-2">
+      <div className="border-t border-border p-6 bg-background/50">
+        <div className="flex gap-3">
           <input
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder="Ask about datacenter locations..."
             disabled={isLoading}
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex h-11 w-full rounded-lg border border-input bg-background px-4 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-200"
           />
           <button
             onClick={() => handleSendMessage()}
             disabled={!inputValue.trim() || isLoading}
-            className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 w-10"
+            className="inline-flex items-center justify-center rounded-lg text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 hover:shadow-md active:scale-95 h-11 w-11"
           >
             <Send className="h-4 w-4" />
           </button>
         </div>
       </div>
-    </div>
+    </Card>
   );
 }

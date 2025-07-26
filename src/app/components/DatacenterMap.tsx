@@ -84,8 +84,10 @@ const INITIAL_VIEW_STATE = {
   longitude: 2.2137,
   latitude: 46.2276,
   zoom: 6,
-  pitch: 0,
-  bearing: 0
+  pitch: 45,
+  bearing: -20,
+  maxZoom: 12,
+  minZoom: 4
 };
 
 const DatacenterMap = forwardRef<DatacenterMapRef, DatacenterMapProps>(
@@ -193,24 +195,24 @@ const DatacenterMap = forwardRef<DatacenterMapRef, DatacenterMapProps>(
     // updateMap function is exposed via ref using useImperativeHandle
 
     const layers = [
-      // Base map layer using free OpenStreetMap tiles
-      new TileLayer({
-        id: 'osm-tiles',
-        data: 'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png',
-        minZoom: 0,
-        maxZoom: 19,
-        renderSubLayers: (props: any) => {
-          const {
-            bbox: { west, south, east, north }
-          } = props.tile;
+          // Base map layer using Carto Positron style for clean look
+    new TileLayer({
+      id: 'carto-positron',
+      data: 'https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
+      minZoom: 0,
+      maxZoom: 19,
+      renderSubLayers: (props: any) => {
+        const {
+          bbox: { west, south, east, north }
+        } = props.tile;
 
-          return new BitmapLayer(props, {
-            data: undefined,
-            image: props.data,
-            bounds: [west, south, east, north]
-          });
-        }
-      }),
+        return new BitmapLayer(props, {
+          data: undefined,
+          image: props.data,
+          bounds: [west, south, east, north]
+        });
+      }
+    }),
       // H3 hexagon layer on top (only if we have data and not loading)
       ...(hexData.length > 0 && !isLoading ? [
         new H3HexagonLayer<HexData>({
@@ -218,22 +220,42 @@ const DatacenterMap = forwardRef<DatacenterMapRef, DatacenterMapProps>(
           data: hexData,
           getHexagon: (d: HexData) => d.hex,
           getFillColor: (d: HexData) => {
-            // Score from 0 to 1, map to red-green
-            const score = Math.max(0, Math.min(1, d.score)); // Clamp to 0-1
-            return [
-              Math.round(255 * (1 - score)), // Red decreases as score increases
-              Math.round(255 * score),       // Green increases as score increases
-              0,
-              180 // Alpha
-            ];
+            // Modern color scheme: Blue to Green gradient for better scores
+            const score = Math.max(0, Math.min(1, d.score));
+            
+            if (score < 0.3) {
+              // Low scores: Red to Orange
+              const t = score / 0.3;
+              return [255, Math.round(100 + 155 * t), 50, 220];
+            } else if (score < 0.7) {
+              // Mid scores: Orange to Yellow
+              const t = (score - 0.3) / 0.4;
+              return [255, Math.round(255), Math.round(50 + 205 * t), 220];
+            } else {
+              // High scores: Yellow to Green
+              const t = (score - 0.7) / 0.3;
+              return [Math.round(255 - 100 * t), 255, Math.round(255 - 155 * t), 220];
+            }
           },
-          getElevation: 0,
+          getElevation: (d: HexData) => d.score * 5000, // Height based on score
+          elevationScale: 1,
           pickable: true,
           stroked: true,
           filled: true,
-          extruded: false,
-          lineWidthMinPixels: 2,
-          getLineColor: [255, 255, 255, 100]
+          extruded: true,
+          wireframe: false,
+          lineWidthMinPixels: 1,
+          getLineColor: (d: HexData) => d.score > 0.8 ? [255, 255, 255, 120] : [255, 255, 255, 60],
+          material: {
+            ambient: 0.64,
+            diffuse: 0.6,
+            shininess: 32,
+            specularColor: [51, 51, 51]
+          },
+          transitions: {
+            getElevation: 600,
+            getFillColor: 300
+          }
         })
       ] : [])
     ];
@@ -248,38 +270,76 @@ const DatacenterMap = forwardRef<DatacenterMapRef, DatacenterMapProps>(
             if (!info.object) return null;
             
             const data = info.object;
+            const scoreColor = data.score > 0.7 ? '#10b981' : data.score > 0.3 ? '#f59e0b' : '#ef4444';
+            
             return {
               html: `
-                <div class="bg-black text-white p-3 rounded max-w-xs">
-                  <div class="font-bold text-sm mb-2">Location: ${data.hex.slice(-6)}</div>
-                  <div class="space-y-1 text-xs">
-                    <div>📊 Score: <span class="font-semibold">${(data.score * 100).toFixed(0)}%</span></div>
-                    ${data.avgTemp ? `<div>🌡️ Temperature: ${data.avgTemp}°C</div>` : ''}
-                    ${data.internetSpeed ? `<div>🌐 Internet: ${data.internetSpeed} Mbps</div>` : ''}
-                    ${data.gridDistance ? `<div>⚡ Grid Distance: ${data.gridDistance}km</div>` : ''}
-                    ${data.nbGridConnections ? `<div>🔌 Grid Connections: ${data.nbGridConnections}</div>` : ''}
-                    ${data.opposition ? `<div>👥 Opposition: ${data.opposition}</div>` : ''}
+                <div class="bg-white/95 backdrop-blur-sm text-gray-900 p-4 rounded-lg shadow-lg border border-gray-200 max-w-xs">
+                  <div class="font-semibold text-gray-700 mb-3 text-sm">Location ${data.hex.slice(-6).toUpperCase()}</div>
+                  <div class="space-y-2 text-sm">
+                    <div class="flex items-center justify-between">
+                      <span class="text-gray-600">Score</span>
+                      <span class="font-bold" style="color: ${scoreColor}">${(data.score * 100).toFixed(0)}%</span>
+                    </div>
+                    ${data.avgTemp ? `
+                      <div class="flex items-center justify-between">
+                        <span class="text-gray-600">🌡️ Temperature</span>
+                        <span class="font-medium">${data.avgTemp}°C</span>
+                      </div>
+                    ` : ''}
+                    ${data.internetSpeed ? `
+                      <div class="flex items-center justify-between">
+                        <span class="text-gray-600">🌐 Internet</span>
+                        <span class="font-medium">${data.internetSpeed} Mbps</span>
+                      </div>
+                    ` : ''}
+                    ${data.gridDistance ? `
+                      <div class="flex items-center justify-between">
+                        <span class="text-gray-600">⚡ Grid Distance</span>
+                        <span class="font-medium">${data.gridDistance}km</span>
+                      </div>
+                    ` : ''}
+                    ${data.nbGridConnections ? `
+                      <div class="flex items-center justify-between">
+                        <span class="text-gray-600">🔌 Connections</span>
+                        <span class="font-medium">${data.nbGridConnections}</span>
+                      </div>
+                    ` : ''}
+                    ${data.opposition ? `
+                      <div class="flex items-center justify-between">
+                        <span class="text-gray-600">👥 Opposition</span>
+                        <span class="font-medium capitalize">${data.opposition}</span>
+                      </div>
+                    ` : ''}
                   </div>
                 </div>
               `,
-              style: { fontSize: '0.8em' }
+              style: { 
+                fontSize: '14px',
+                pointerEvents: 'none',
+                zIndex: '1000'
+              }
             };
           }}
         />
         
         {/* Loading overlay */}
         {isLoading && (
-          <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center">
-            <div className="bg-white text-black px-4 py-2 rounded shadow-lg">
-              Updating map data...
+          <div className="absolute inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50">
+            <div className="bg-white/95 backdrop-blur text-gray-900 px-6 py-4 rounded-lg shadow-lg border border-gray-200 flex items-center gap-3">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
+              <span className="font-medium">Updating map data...</span>
             </div>
           </div>
         )}
         
         {/* Empty state message */}
         {hexData.length === 0 && !isLoading && (
-          <div className="absolute top-4 left-4 bg-white text-black px-4 py-2 rounded shadow-lg">
-            No datacenter data available
+          <div className="absolute top-6 left-6 bg-white/95 backdrop-blur text-gray-900 px-4 py-3 rounded-lg shadow-lg border border-gray-200">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+              <span className="text-sm font-medium">No datacenter data available</span>
+            </div>
           </div>
         )}
       </div>
