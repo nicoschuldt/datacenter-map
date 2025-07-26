@@ -65,6 +65,10 @@ function generateSampleFranceHexagons(): HexData[] {
     { lat: 48.1173, lng: -1.6778, name: 'Rennes' },
     { lat: 47.4784, lng: -0.5632, name: 'Angers' },
     { lat: 43.7102, lng: 7.2620, name: 'Nice' },
+    // Add Corsica locations
+    { lat: 42.1528, lng: 9.0124, name: 'Ajaccio' },
+    { lat: 42.6977, lng: 9.4500, name: 'Bastia' },
+    { lat: 41.9192, lng: 8.7386, name: 'Propriano' },
   ];
 
   return frenchCities.map((city, index) => {
@@ -91,13 +95,13 @@ function generateSampleFranceHexagons(): HexData[] {
 }
 
 const INITIAL_VIEW_STATE = {
-  longitude: 2.2137,
-  latitude: 46.2276,
-  zoom: 6,
+  longitude: 4.0,  // Centered to include both France mainland and Corsica
+  latitude: 44.0,  // Lower latitude to include Corsica
+  zoom: 5,         // Zoomed out to show both regions
   pitch: 45,
   bearing: -20,
   maxZoom: 12,
-  minZoom: 4
+  minZoom: 3       // Allow more zoom out
 };
 
 const DatacenterMap = forwardRef<DatacenterMapRef, DatacenterMapProps>(
@@ -166,12 +170,12 @@ const DatacenterMap = forwardRef<DatacenterMapRef, DatacenterMapProps>(
         .map(([hexId, hexInfo]) => ({
           hex: hexId,
           score: Math.max(0, Math.min(1, Number(hexInfo.score.toFixed(2)))), // Clamp to 0-1
-          connection_points: hexInfo.connection_points || undefined,
-          latency_ms: hexInfo.latency_ms || undefined,
-          avg_temperature: hexInfo.avg_temperature || undefined,
-          connection_normalized_score: hexInfo.connection_normalized_score ? Number(hexInfo.connection_normalized_score.toFixed(2)) : undefined,
-          latency_normalized_score: hexInfo.latency_normalized_score ? Number(hexInfo.latency_normalized_score.toFixed(2)) : undefined,
-          temperature_normalized_score: hexInfo.temperature_normalized_score ? Number(hexInfo.temperature_normalized_score.toFixed(2)) : undefined,
+          connection_points: hexInfo.connection_points !== null ? hexInfo.connection_points : undefined,
+          latency_ms: hexInfo.latency_ms !== null ? hexInfo.latency_ms : undefined,
+          avg_temperature: hexInfo.avg_temperature !== null ? hexInfo.avg_temperature : undefined,
+          connection_normalized_score: hexInfo.connection_normalized_score !== null && hexInfo.connection_normalized_score !== undefined ? Number(hexInfo.connection_normalized_score.toFixed(2)) : undefined,
+          latency_normalized_score: hexInfo.latency_normalized_score !== null && hexInfo.latency_normalized_score !== undefined ? Number(hexInfo.latency_normalized_score.toFixed(2)) : undefined,
+          temperature_normalized_score: hexInfo.temperature_normalized_score !== null && hexInfo.temperature_normalized_score !== undefined ? Number(hexInfo.temperature_normalized_score.toFixed(2)) : undefined,
           opposition: hexInfo.opposition || undefined
         }));
     };
@@ -179,6 +183,8 @@ const DatacenterMap = forwardRef<DatacenterMapRef, DatacenterMapProps>(
     // Update map function
     const updateMap = useCallback((data: BackendResponse): void => {
       try {
+        console.log('Received backend data:', data);
+        
         if (!validateHexData(data)) {
           console.warn('Data validation failed, keeping current data');
           return;
@@ -186,6 +192,7 @@ const DatacenterMap = forwardRef<DatacenterMapRef, DatacenterMapProps>(
 
         setIsLoading(true);
         const transformedData = transformBackendData(data);
+        console.log('Transformed data:', transformedData);
         setHexData(transformedData);
         console.log('Map updated with', transformedData.length, 'hexagons');
       } catch (error) {
